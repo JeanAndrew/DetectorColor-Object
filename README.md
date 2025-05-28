@@ -4,8 +4,9 @@ Este proyecto permite detectar objetos específicos usando una cámara web y el 
 
 ## 💻 Requisitos
 
-- Python 3.8 o superior
+- Visual Studio 
 - Cámara web
+- Se descarga la aplicación IP Webcam
 
 ### 📦 Instalación
 
