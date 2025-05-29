@@ -105,7 +105,7 @@ known_colors = {
     "blanco ahumado": (245, 245, 245),
     "blanco marfil": (255, 255, 240),
     "blanco antiguo": (250, 235, 215),
-    "negro": (80, 103, 140), # Aquí el negro puro
+    "negro": (0, 0, 0), # Aquí el negro puro
     "negro azabache": (25, 25, 25),
     "negro carbón": (50, 50, 50),
     "negro ultra oscuro": (5, 5, 5),
@@ -127,9 +127,9 @@ known_colors = {
 # Función para obtener el color dominante
 def get_dominant_color(image, k=1):
     if image.size == 0:
-        return 0, 0, 0
-    image = cv2.resize(image, (100, 100))
-    pixels = np.float32(image.reshape(-1, 3))
+        return 0, 0, 0 # Si la imagen está vacía
+    image = cv2.resize(image, (100, 100))   # Redimensiona para agilizar el proceso
+    pixels = np.float32(image.reshape(-1, 3))  # Convierte imagen a una lista de píxeles
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
     _, _, palette = cv2.kmeans(pixels, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
     bgr = palette[0].astype(int)
@@ -148,29 +148,29 @@ def rgb_to_color_name(r, g, b):
 
 # Mostrar clases disponibles
 available_classes = [label_translation.get(name.lower(), name) for name in model.names.values()]
-print("🧠 Clases disponibles en el modelo:")
+print(" Clases disponibles en el modelo:")
 print(", ".join(available_classes))
 
 # Entrada del usuario
-target_input = input("\n📝 Objeto a detectar (inglés o español): ").strip().lower()
+target_input = input("\n Objeto a detectar (inglés o español): ").strip().lower()
 reverse_translation = {v: k for k, v in label_translation.items()}
 target_object_en = reverse_translation.get(target_input, target_input)
 
 if target_object_en not in model.names.values():
-    print(f"❌ El objeto '{target_input}' no está disponible en el modelo YOLO.")
+    print(f" El objeto '{target_input}' no está disponible en el modelo YOLO.")
     exit()
 
 target_class_id = [k for k, v in model.names.items() if v == target_object_en][0]
 target_label_es = label_translation.get(target_object_en, target_object_en)
-print(f"🔎 Buscando: '{target_label_es}'\n")
+print(f"Buscando: '{target_label_es}'\n")
 
 # --- CÁMARA: INTENTA CÁMARA DEL MÓVIL PRIMERO ---
-ip_cam_url = "http://100.93.241.248:8080/video"
+ip_cam_url = "http://192.168.1.104:8080/video"
 cap = cv2.VideoCapture(ip_cam_url)
 
 # Si falla, usa la webcam local
 if not cap.isOpened():
-    print("⚠️ No se pudo abrir la cámara IP. Usando cámara local.")
+    print(" No se pudo abrir la cámara IP. Usando cámara local.")
     cap = cv2.VideoCapture(0)
 
 paused = False
@@ -178,46 +178,48 @@ paused = False
 while True:
     ret, frame = cap.read()
     if not ret:
-        print("❌ No se pudo leer el frame.")
+        print("No se pudo leer el frame.")
         break
 
     key = cv2.waitKey(1) & 0xFF
     if key == ord(' '):
         paused = not paused
-        print("⏸️ Pausado" if paused else "▶️ Reanudado")
+        print("Pausado" if paused else "Reanudado")
     elif key == 27:  # ESC
-        print("🚪 Cerrando por tecla ESC...")
+        print("Cerrando por tecla ESC...")
         break
 
     if paused:
-        cv2.putText(frame, "⏸️ PAUSADO", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+        cv2.putText(frame, " PAUSADO", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
         cv2.imshow("Detección de objetos", frame)
         continue
 
     results = model(frame, verbose=False)[0]
+    
+    # Filtra solo las cajas que corresponden al objeto deseado
     boxes = [b for b in results.boxes if int(b.cls[0]) == target_class_id]
 
     if boxes:
+        # Selecciona la caja más grande (objeto más prominente)
         biggest_box = max(boxes, key=lambda b: (b.xyxy[0][2] - b.xyxy[0][0]) * (b.xyxy[0][3] - b.xyxy[0][1]))
         x1, y1, x2, y2 = map(int, biggest_box.xyxy[0])
         x1, y1 = max(0, x1), max(0, y1)
         x2, y2 = min(frame.shape[1], x2), min(frame.shape[0], y2)
-
+            # Extrae la región del objeto detectado
         object_region = frame[y1:y2, x1:x2]
         if object_region.size > 0:
             r, g, b = get_dominant_color(object_region)
             color_name = rgb_to_color_name(r, g, b)
         else:
             color_name = "color desconocido"
-
+          # Crea texto con el nombre del objeto y el color
         label_text = f"{target_label_es} ({color_name})"
+         # Dibuja el rectángulo y etiqueta en la imagen
         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
         cv2.putText(frame, label_text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-
+     # Muestra el frame con detecciones
     cv2.imshow("Detección de objetos", frame)
 
-# Cierre
+# Libera la cámara y cierra las ventanas al terminar
 cap.release()
 cv2.destroyAllWindows()
-
-
